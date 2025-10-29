@@ -40,30 +40,69 @@
         </section>
         
         <section class="confession-wall" id="confessionWall">
-            <div class="empty-wall" id="emptyWall">No confessions yet. Be the first to share!</div>
+            <div class="empty-wall" id="emptyWall">Loading confessions...</div>
         </section>
     </div>
 
     <script>
-        // Simple in-memory storage (resets on page refresh - for demo)
-        let confessions = [
-            { name: "Jims", message: "Mahal kops sys", date: "2024-10-28" },
-            { name: "De kira", message: "ang pogi mo", date: "2024-10-29" },
-            { name: "deaccesso accesso", message: "Accesso accesso", date: "2024-10-29" }
-        ];
+        // JSONBin Configuration - REPLACE THESE WITH YOUR CREDENTIALS
+        const BIN_ID = '690200e580b27952c6e762b7';
+        const API_KEY = 'YOUR_ACCESS_KEY_HERE'; // ← Replace this
+        
+        let confessions = [];
         
         const confessionForm = document.getElementById('confessionForm');
         const confessionWall = document.getElementById('confessionWall');
         const emptyWall = document.getElementById('emptyWall');
         
+        // Load confessions from JSONBin
+        async function loadConfessions() {
+            try {
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: {
+                        'X-Master-Key': API_KEY
+                    }
+                });
+                const data = await response.json();
+                confessions = data.record.confessions || [];
+                displayConfessions();
+            } catch (error) {
+                console.log('Error loading confessions:', error);
+                emptyWall.textContent = 'Failed to load confessions. Try refreshing.';
+            }
+        }
+        
+        // Save confessions to JSONBin
+        async function saveConfessions() {
+            try {
+                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': API_KEY
+                    },
+                    body: JSON.stringify({ confessions: confessions })
+                });
+            } catch (error) {
+                console.error('Error saving confession:', error);
+                alert('Failed to save confession. Please try again.');
+            }
+        }
+        
+        // Display confessions
         function displayConfessions() {
             confessionWall.innerHTML = '';
+            
             if (confessions.length === 0) {
+                emptyWall.textContent = 'No confessions yet. Be the first to share!';
                 emptyWall.style.display = 'block';
                 confessionWall.appendChild(emptyWall);
                 return;
             }
+            
             emptyWall.style.display = 'none';
+            
+            confessions.sort((a, b) => new Date(b.date) - new Date(a.date));
             
             confessions.forEach(confession => {
                 const confessionCard = document.createElement('div');
@@ -71,33 +110,38 @@
                 confessionCard.innerHTML = `
                     <p class="confession-text">${confession.message}</p>
                     <p class="confession-author">- ${confession.name}</p>
-                    <p class="confession-date">${confession.date}</p>
+                    <p class="confession-date">${new Date(confession.date).toLocaleDateString()}</p>
                 `;
                 confessionWall.appendChild(confessionCard);
             });
         }
         
-        confessionForm.addEventListener('submit', function(e) {
+        // Handle form submission
+        confessionForm.addEventListener('submit', async function(e) {
             e.preventDefault();
+            
             const name = document.getElementById('secretName').value.trim() || 'Anonymous';
             const message = document.getElementById('confessionMessage').value.trim();
-            if (!message) { alert('Please write a confession before submitting.'); return; }
+            
+            if (!message) {
+                alert('Please write a confession before submitting.');
+                return;
+            }
             
             const newConfession = {
                 name: name,
                 message: message,
-                date: new Date().toLocaleDateString()
+                date: new Date().toISOString()
             };
             
             confessions.push(newConfession);
+            await saveConfessions();
             confessionForm.reset();
             displayConfessions();
-            
-            // Show success message
-            alert('Confession posted! (Note: This is demo version - confessions reset on refresh)');
         });
         
-        displayConfessions();
+        // Initial load
+        loadConfessions();
     </script>
 </body>
 </html>
