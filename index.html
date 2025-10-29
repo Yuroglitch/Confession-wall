@@ -15,6 +15,13 @@
         .confession-card { background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
         button { background-color: #6a5acd; color: white; border: none; padding: 12px 25px; border-radius: 5px; cursor: pointer; }
         .empty-wall { text-align: center; padding: 40px; color: #888; grid-column: 1 / -1; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; }
+        input, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem; }
+        textarea { height: 150px; resize: vertical; }
+        .confession-text { margin-bottom: 15px; line-height: 1.6; }
+        .confession-author { font-style: italic; color: #6a5acd; font-weight: 600; text-align: right; }
+        .confession-date { font-size: 0.8rem; color: #888; margin-top: 5px; text-align: right; }
     </style>
 </head>
 <body>
@@ -45,9 +52,9 @@
     </div>
 
     <script>
-        // JSONBin Configuration - REPLACE THESE WITH YOUR CREDENTIALS
+        // JSONBin Configuration
         const BIN_ID = '690200e580b27952c6e762b7';
-        const API_KEY = 'YOUR_ACCESS_KEY_HERE'; // ← Replace this
+        const API_KEY = '$2a$10$7mUz5OEp6WeuL2J/OcGaV.76j4LCSVou5jBJ.dJjjHn1Cp/0Lm2SC';
         
         let confessions = [];
         
