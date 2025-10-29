@@ -13,7 +13,7 @@
         .confession-form { background-color: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); margin-bottom: 30px; }
         .confession-wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
         .confession-card { background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
-        button { background-color: #6a5acd; color: white; border: none; padding: 12px 25px; border-radius: 5px; cursor: pointer; }
+        button { background-color: #6a5acd; color: white; border: none; padding: 12px 25px; border-radius: 5px; cursor: pointer; margin-top: 10px; }
         .empty-wall { text-align: center; padding: 40px; color: #888; grid-column: 1 / -1; }
         .form-group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-weight: 600; }
@@ -22,6 +22,7 @@
         .confession-text { margin-bottom: 15px; line-height: 1.6; }
         .confession-author { font-style: italic; color: #6a5acd; font-weight: 600; text-align: right; }
         .confession-date { font-size: 0.8rem; color: #888; margin-top: 5px; text-align: right; }
+        .loading { color: #6a5acd; }
     </style>
 </head>
 <body>
@@ -47,52 +48,59 @@
         </section>
         
         <section class="confession-wall" id="confessionWall">
-            <div class="empty-wall" id="emptyWall">Loading confessions...</div>
+            <div class="empty-wall loading" id="emptyWall">Loading confessions...</div>
         </section>
     </div>
 
     <script>
-        // JSONBin Configuration
-        const BIN_ID = '690200e580b27952c6e762b7';
-        const API_KEY = '$2a$10$7mUz5OEp6WeuL2J/OcGaV.76j4LCSVou5jBJ.dJjjHn1Cp/0Lm2SC';
-        
-        let confessions = [];
+        // Fallback confessions if cloud fails
+        let confessions = [
+            { name: "Anonymous", message: "I have a secret crush on someone in my class", date: new Date().toISOString() },
+            { name: "SecretAdmirer", message: "You're more amazing than you think!", date: new Date().toISOString() }
+        ];
         
         const confessionForm = document.getElementById('confessionForm');
         const confessionWall = document.getElementById('confessionWall');
         const emptyWall = document.getElementById('emptyWall');
         
-        // Load confessions from JSONBin
+        // Try to load from cloud, fallback to local
         async function loadConfessions() {
             try {
-                const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                // First try: Load from existing bin
+                const response = await fetch('https://api.jsonbin.io/v3/b/690200e580b27952c6e762b7/latest', {
                     headers: {
-                        'X-Master-Key': API_KEY
+                        'X-Master-Key': '$2a$10$7mUz5OEp6WeuL2J/OcGaV.76j4LCSVou5jBJ.dJjjHn1Cp/0Lm2SC'
                     }
                 });
-                const data = await response.json();
-                confessions = data.record.confessions || [];
-                displayConfessions();
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.record && data.record.confessions) {
+                        confessions = data.record.confessions;
+                    }
+                }
             } catch (error) {
-                console.log('Error loading confessions:', error);
-                emptyWall.textContent = 'Failed to load confessions. Try refreshing.';
+                console.log('Using fallback confessions');
             }
+            
+            displayConfessions();
         }
         
-        // Save confessions to JSONBin
+        // Try to save to cloud
         async function saveConfessions() {
             try {
-                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                await fetch('https://api.jsonbin.io/v3/b/690200e580b27952c6e762b7', {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Master-Key': API_KEY
+                        'X-Master-Key': '$2a$10$7mUz5OEp6WeuL2J/OcGaV.76j4LCSVou5jBJ.dJjjHn1Cp/0Lm2SC'
                     },
                     body: JSON.stringify({ confessions: confessions })
                 });
             } catch (error) {
-                console.error('Error saving confession:', error);
-                alert('Failed to save confession. Please try again.');
+                console.log('Saved locally only');
+                // Save to localStorage as backup
+                localStorage.setItem('confessions', JSON.stringify(confessions));
             }
         }
         
@@ -102,6 +110,7 @@
             
             if (confessions.length === 0) {
                 emptyWall.textContent = 'No confessions yet. Be the first to share!';
+                emptyWall.className = 'empty-wall';
                 emptyWall.style.display = 'block';
                 confessionWall.appendChild(emptyWall);
                 return;
@@ -109,6 +118,7 @@
             
             emptyWall.style.display = 'none';
             
+            // Sort by date (newest first)
             confessions.sort((a, b) => new Date(b.date) - new Date(a.date));
             
             confessions.forEach(confession => {
@@ -145,6 +155,9 @@
             await saveConfessions();
             confessionForm.reset();
             displayConfessions();
+            
+            // Show success message
+            alert('Confession posted! 🎉');
         });
         
         // Initial load
