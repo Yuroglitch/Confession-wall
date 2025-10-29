@@ -25,7 +25,9 @@
         .confession-text { margin-bottom: 15px; line-height: 1.6; }
         .confession-author { font-style: italic; color: #6a5acd; font-weight: 600; text-align: right; }
         .confession-date { font-size: 0.8rem; color: #888; margin-top: 5px; text-align: right; }
+        .loading { color: #6a5acd; }
         .success-message { background-color: #d4edda; color: #155724; padding: 10px; border-radius: 5px; margin: 10px 0; text-align: center; }
+        .error-message { background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; margin: 10px 0; text-align: center; }
     </style>
 </head>
 <body>
@@ -37,9 +39,8 @@
         
         <section class="confession-form">
             <h2>Share Your Confession</h2>
-            <div id="successMessage" class="success-message" style="display: none;">
-                Confession posted successfully! 🎉
-            </div>
+            <div id="successMessage" class="success-message" style="display: none;"></div>
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
             <form id="confessionForm">
                 <div class="form-group">
                     <label for="secretName">Your Secret Name (Optional)</label>
@@ -54,51 +55,107 @@
         </section>
         
         <section class="confession-wall" id="confessionWall">
-            <div class="empty-wall" id="emptyWall">No confessions yet. Be the first to share!</div>
+            <div class="empty-wall loading" id="emptyWall">Loading confessions from cloud...</div>
         </section>
     </div>
 
     <script>
-        // SIMPLE LOCAL STORAGE SOLUTION - 100% WORKING
+        // REPLACE THIS WITH YOUR GOOGLE APPS SCRIPT URL
+        const SCRIPT_URL = 'https://script.google.com/home/projects/1y4yOBskRT8_IhaChum3d-D7ZpTkJmSOLjdLQy9GZNlKVmxIOYA_-B9IX/edit';
+        
         let confessions = [];
         
         const confessionForm = document.getElementById('confessionForm');
         const confessionWall = document.getElementById('confessionWall');
         const emptyWall = document.getElementById('emptyWall');
         const successMessage = document.getElementById('successMessage');
+        const errorMessage = document.getElementById('errorMessage');
         
-        // Load confessions from localStorage
-        function loadConfessions() {
+        // Load confessions from Google Sheets
+        async function loadConfessions() {
+            try {
+                showMessage('Loading confessions from cloud...', 'loading');
+                
+                const response = await fetch(`${SCRIPT_URL}?action=get`);
+                const data = await response.json();
+                
+                if (data.success && data.confessions) {
+                    confessions = data.confessions;
+                    if (confessions.length === 0) {
+                        showMessage('No confessions yet. Be the first to share!', 'empty');
+                    } else {
+                        displayConfessions();
+                    }
+                } else {
+                    throw new Error(data.error || 'Failed to load confessions');
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+                showMessage('Could not load cloud data. Using local storage.', 'error');
+                loadFromLocalStorage();
+            }
+        }
+        
+        // Save confession to Google Sheets
+        async function saveConfession(confession) {
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'add',
+                        confession: confession
+                    })
+                });
+                
+                const result = await response.json();
+                return result.success;
+            } catch (error) {
+                console.error('Save error:', error);
+                return false;
+            }
+        }
+        
+        // Local storage fallback
+        function loadFromLocalStorage() {
             const saved = localStorage.getItem('confessionWallData');
             if (saved) {
                 confessions = JSON.parse(saved);
+                displayConfessions();
             } else {
-                // Default sample confessions
-                confessions = [
-                    { 
-                        name: "Anonymous", 
-                        message: "I have a secret crush on someone in my class...", 
-                        date: new Date().toISOString() 
-                    },
-                    { 
-                        name: "Secret Admirer", 
-                        message: "You're more amazing than you think! Don't doubt yourself.", 
-                        date: new Date().toISOString() 
-                    },
-                    { 
-                        name: "Whisper", 
-                        message: "Sometimes I feel lonely even when I'm with friends.", 
-                        date: new Date().toISOString() 
-                    }
-                ];
-                saveConfessions();
+                confessions = getSampleConfessions();
+                displayConfessions();
             }
-            displayConfessions();
         }
         
-        // Save confessions to localStorage
-        function saveConfessions() {
+        function saveToLocalStorage(confession) {
+            confessions.push(confession);
             localStorage.setItem('confessionWallData', JSON.stringify(confessions));
+        }
+        
+        function getSampleConfessions() {
+            return [
+                { 
+                    name: "Anonymous", 
+                    message: "I have a secret crush on someone... 💕", 
+                    date: new Date().toISOString(),
+                    id: "1"
+                },
+                { 
+                    name: "Secret Admirer", 
+                    message: "You're more amazing than you think! Never give up! ✨", 
+                    date: new Date().toISOString(),
+                    id: "2"
+                },
+                { 
+                    name: "Whisper", 
+                    message: "Sometimes the bravest thing is to be yourself. 🌟", 
+                    date: new Date().toISOString(),
+                    id: "3"
+                }
+            ];
         }
         
         // Display confessions
@@ -106,8 +163,7 @@
             confessionWall.innerHTML = '';
             
             if (confessions.length === 0) {
-                emptyWall.style.display = 'block';
-                confessionWall.appendChild(emptyWall);
+                showMessage('No confessions yet. Be the first to share!', 'empty');
                 return;
             }
             
@@ -128,36 +184,57 @@
             });
         }
         
+        function showMessage(text, type) {
+            emptyWall.textContent = text;
+            emptyWall.className = `empty-wall ${type}`;
+            emptyWall.style.display = 'block';
+            confessionWall.innerHTML = '';
+            confessionWall.appendChild(emptyWall);
+        }
+        
+        function showAlert(message, isSuccess) {
+            const element = isSuccess ? successMessage : errorMessage;
+            element.textContent = message;
+            element.style.display = 'block';
+            setTimeout(() => {
+                element.style.display = 'none';
+            }, 4000);
+        }
+        
         // Handle form submission
-        confessionForm.addEventListener('submit', function(e) {
+        confessionForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const name = document.getElementById('secretName').value.trim() || 'Anonymous';
             const message = document.getElementById('confessionMessage').value.trim();
             
             if (!message) {
-                alert('Please write a confession before submitting.');
+                showAlert('Please write a confession before submitting.', false);
                 return;
             }
             
             const newConfession = {
                 name: name,
                 message: message,
-                date: new Date().toISOString()
+                date: new Date().toISOString(),
+                id: Date.now().toString()
             };
             
-            confessions.push(newConfession);
-            saveConfessions();
+            // Try to save to cloud first
+            const savedToCloud = await saveConfession(newConfession);
+            
+            if (savedToCloud) {
+                showAlert('Confession posted to cloud! Everyone can see it! 🎉', true);
+                // Reload all confessions from cloud
+                await loadConfessions();
+            } else {
+                // Fallback to local storage
+                saveToLocalStorage(newConfession);
+                displayConfessions();
+                showAlert('Confession saved locally (cloud unavailable)', true);
+            }
+            
             confessionForm.reset();
-            displayConfessions();
-            
-            // Show success message
-            successMessage.style.display = 'block';
-            setTimeout(() => {
-                successMessage.style.display = 'none';
-            }, 3000);
-            
-            // Scroll to show new confession
             confessionWall.scrollIntoView({ behavior: 'smooth' });
         });
         
